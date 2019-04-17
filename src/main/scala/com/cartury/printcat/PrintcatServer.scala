@@ -210,8 +210,8 @@ object PrintcatConst {
   val ERROR = 0
   val SUCCESS = 1
 }
-case class ServerArgs(var port: Int = 80
-) extends Arguments {
+
+case class ServerArgs(var port: Int = 80) extends Arguments {
   override def usage: String =
     """
       |--port

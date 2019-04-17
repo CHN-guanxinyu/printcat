@@ -56,7 +56,6 @@ object PrintcatClient extends App {
       is.close
       result
     } else "printcat服务连接异常"
-
   }
 }
 

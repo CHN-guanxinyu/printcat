@@ -3,7 +3,7 @@ package com.cartury.printcat
 import java.io.{DataInputStream, DataOutputStream}
 import java.net.Socket
 
-private[printcat] class PrintcatClientUtil(SERVER_HOST: String, SERVER_PORT: Int) {
+case class PrintcatClientUtil(serverHost: String, serverPort: Int) {
   private val GET_PRINTER_LIST = "GetPrinterList"
   private val PRINT = "Print"
 
@@ -16,7 +16,7 @@ private[printcat] class PrintcatClientUtil(SERVER_HOST: String, SERVER_PORT: Int
   }
 
   private def action(body: (DataInputStream, DataOutputStream) => Unit) = {
-    val server = new Socket(SERVER_HOST, SERVER_PORT)
+    val server = new Socket(serverHost, serverPort)
     if (server.isConnected) {
       val os = new DataOutputStream(server.getOutputStream)
       val is = new DataInputStream(server.getInputStream)
@@ -27,13 +27,5 @@ private[printcat] class PrintcatClientUtil(SERVER_HOST: String, SERVER_PORT: Int
       result
     } else "printcat服务连接异常"
 
-  }
-}
-object PrintcatClientUtil {
-  private var instance: PrintcatClientUtil = _
-
-  def apply(host: String, port: Int) = {
-    if (instance == null) instance = new PrintcatClientUtil(host, port)
-    instance
   }
 }

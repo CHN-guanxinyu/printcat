@@ -21,7 +21,7 @@ object FileUtil {
         val doc = new SimpleDoc(fis, flavor, das)
         job.print(doc, pras)
       } catch {
-        case e => e.printStackTrace
+        case e: Throwable => e.printStackTrace
       }
     }
   }

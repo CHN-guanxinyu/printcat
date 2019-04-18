@@ -6,7 +6,7 @@ lazy val printcat = preownedKittenProject("printcat", ".").
          |While the provided code may still work, we recommend that you
          |upgrade your version of Java.
     """.stripMargin
-    } else ""))
+    } else "")), libraryDependencies ++= Lib.akka.all
   ).settings(CommonSetting.projectSettings)
 
 

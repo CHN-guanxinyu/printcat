@@ -2,5 +2,5 @@
 cd `dirname $0`
 DIR=$('pwd')
 java -cp $DIR/../printcat.jar \
-com.cartury.printcat.PrintcatServer \
+com.cartury.printcat.PrintcatClient \
 $*

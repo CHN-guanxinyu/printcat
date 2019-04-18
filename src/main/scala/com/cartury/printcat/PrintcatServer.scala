@@ -2,6 +2,7 @@ package com.cartury.printcat
 
 import java.io._
 import java.net.{ServerSocket, Socket}
+import java.nio.file.{FileSystems, Paths, StandardWatchEventKinds}
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.{ConcurrentHashMap, LinkedBlockingQueue, TimeUnit}
 
@@ -14,9 +15,19 @@ import scala.concurrent.Future
 import scala.util.Try
 
 object PrintcatServer extends App {
-
   import PrintcatConst._
 
+  val serverArgs = args.as[ServerArgs]
+
+  Future {
+    val watch = FileSystems.getDefault.newWatchService
+    val path = Paths.get(serverArgs.closeFlag)
+    path.register(watch, StandardWatchEventKinds.ENTRY_CREATE)
+    println(s"watch close path: ${serverArgs.closeFlag}")
+    watch.take
+    println("检测到关闭指令")
+    System exit 0
+  }
   /**
     * @param client
     */
@@ -35,9 +46,9 @@ object PrintcatServer extends App {
         keepAlive = true
         out writeInt SUCCESS
       case Array("GetPrinterList") => val printersAvaliable = processListPrinter(client)
-        out writeUTF printersAvaliable.mkString("\t")
+        new ObjectOutputStream(out).writeObject(printersAvaliable mkString "\t")
       case Array("Print", printer, paths) => out writeUTF processPrint(printer, paths)
-      case c => out writeUTF s"无效的命令: $msg"
+      case _ => out writeUTF s"无效的命令: $msg"
     }
 
     if (!keepAlive) {
@@ -76,7 +87,7 @@ object PrintcatServer extends App {
   }
 
 
-  val _port = args.as[ServerArgs].port
+  val _port = serverArgs.port
   val _listener: ServerSocket = new ServerSocket(_port)
   println(s"start up printcat server on port ${_port}")
 
@@ -113,10 +124,11 @@ object PrintcatServer extends App {
     //提交GetNetworkStatusMission, 得到任务id
     val printerToMissionId = _missionsForPrinter.keys.toList.map { printer =>
       printer -> pendingMission(printer, GetNetworkStatusMission(nextMissionId))
-      }
+    }
 
     printerToMissionId.flatMap { case (printer, mid) => val lost = _missions(mid).takeResult.asInstanceOf[Boolean]
       if (lost) {
+        printLostConnection(client)
         client.close
         removePrinter(printer)
         None
@@ -131,9 +143,7 @@ object PrintcatServer extends App {
 
   def sendFile(client: Socket, file: File): String = {
     if (connectionLost(client)) {
-      val err = s"lost connection error: $client"
-      println(err)
-      err
+      printLostConnection(client)
     } else {
       println(s"send file ${file.getName} to client [$client]")
       val os = getOutputStream(client)
@@ -187,10 +197,15 @@ object PrintcatServer extends App {
     os flush
   }
 
+  def printLostConnection(client: Socket) = {
+    val err = s"lost connection error: $client"
+    println(err)
+    err
+  }
   while (true) try {
     recieve(_listener.accept)
   } catch {
-    case e => e.printStackTrace
+    case e: Throwable => e.printStackTrace
   }
 }
 
@@ -211,9 +226,12 @@ object PrintcatConst {
   val SUCCESS = 1
 }
 
-case class ServerArgs(var port: Int = 80) extends Arguments {
+case class ServerArgs(
+  var port: Int = 10001, var closeFlag: String = "d:/tmp/close"
+) extends Arguments {
   override def usage: String =
     """
       |--port
+      |--close-flag
     """.stripMargin
 }

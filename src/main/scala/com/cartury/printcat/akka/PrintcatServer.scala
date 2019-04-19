@@ -15,12 +15,11 @@ import scala.concurrent.Future
 object PrintcatServer extends ActorBase("Printcat") {
   system.actorOf(Props(new PrintcatServer(printcatConfig)), "server")
   implicit val ec = system.dispatcher
-  Future {
-    FileServer main args
-  }
-
+  Future { FileServer main args }
   override def sysConfigStr: String =
-    s"""|akka.remote.netty.tcp.host=${printcatConfig.PRINTCAT_SERVER_HOST}|akka.remote.netty.tcp.port=${printcatConfig.PRINTCAT_SERVER_PORT}
+    s"""
+       |akka.remote.netty.tcp.host=${printcatConfig.PRINTCAT_SERVER_HOST}
+       |akka.remote.netty.tcp.port=${printcatConfig.PRINTCAT_SERVER_PORT}
      """.stripMargin
 }
 
@@ -37,13 +36,10 @@ class PrintcatServer(conf: PrintcatConfig) extends Actor with ActorLogging {
   }
 
   private val _nextClientId = new AtomicLong(0)
-
   private def nextClientId = _nextClientId.getAndIncrement
 
   private val _nextJobId = new AtomicLong(0)
-
   private def nextJobId = _nextJobId.getAndIncrement
-
   //jobId -> (printerId, filePath, userCaller)
   private val _printJobList = new ConcurrentHashMap[Long, (Long, String, ActorRef)]()
 
@@ -62,7 +58,12 @@ class PrintcatServer(conf: PrintcatConfig) extends Actor with ActorLogging {
   private def checkPrinterHeartBeat() = pool.scheduleWithFixedDelay(new Runnable {
     override def run() = {
       logDebug(
-        s"""|===================================================|curTime -> ${format(curTime)}|_printerEndpoint -> ${_printerEndpoint}|_printerDeadList -> ${_printerDeadList}|_heartBeatInfo -> ${_heartBeatInfo.mapValues(format)}|_printerMaybeDead -> ${_printerMaybeDead.mapValues(format)}
+        s"""|===================================================
+            |curTime -> ${format(curTime)}
+            |_printerEndpoint -> ${_printerEndpoint}
+            |_printerDeadList -> ${_printerDeadList}
+            |_heartBeatInfo -> ${_heartBeatInfo.mapValues(format)}
+            |_printerMaybeDead -> ${_printerMaybeDead.mapValues(format)}
           """.stripMargin)
       _heartBeatInfo.foreach { case (id, lastTime) => if (curTime - lastTime > 3000) {
         log info s"[client-$id] 短时间超时，加入低级队列"
@@ -92,20 +93,18 @@ class PrintcatServer(conf: PrintcatConfig) extends Actor with ActorLogging {
   private def logDebug(str: String) = if (debug) println(str)
 
 
-  private def processRegister(printer: String): Unit = {
+  private def processRegister(printer: String): Unit ={
     log info "register"
     val cid = nextClientId
     _printerEndpoint.put(cid, (printer, sender))
     _heartBeatInfo.put(cid, curTime)
     sender ! RegisterResp(cid)
   }
-
-  private def processListPrinters = {
+  private def processListPrinters={
     log info "GetPrinterList"
     sender ! PrinterListResult(_printerEndpoint.mapValues(_._1).toList)
   }
-
-  private def processPrint(id: Long, path: String) = {
+  private def processPrint(id: Long, path: String) ={
     log info s"print $id $path"
     if (_printerEndpoint containsKey id) {
       val jobId = nextJobId
@@ -114,22 +113,24 @@ class PrintcatServer(conf: PrintcatConfig) extends Actor with ActorLogging {
       printer ! DoPrint(jobId, path)
     }
   }
-
   private def getJobCaller(id: Long) = {
     val res = _printJobList remove id
     println(res)
     res
   }
+  private def processPrintSuccess(jobId: Long) =
+    getJobCaller(jobId) match {
+      case (id, path, caller) =>
+        caller ! PrintSuceessResp(_printerEndpoint get id _1, path)
+    }
 
-  private def processPrintSuccess(jobId: Long) = getJobCaller(jobId) match {
-    case (id, path, caller) => caller ! PrintSuceessResp(_printerEndpoint get id _1, path)
-  }
+  private def processPrintError(jobId: Long, err: String) =
+    getJobCaller(jobId) match {
+      case (id, path, caller) =>
+        caller ! PrintErrorResp(_printerEndpoint get id _1, path, err)
+    }
 
-  private def processPrintError(jobId: Long, err: String) = getJobCaller(jobId) match {
-    case (id, path, caller) => caller ! PrintErrorResp(_printerEndpoint get id _1, path, err)
-  }
-
-  private def processHeartBeat(id: Long) = {
+  private def processHeartBeat(id: Long)={
     log info s"recieved heartbeat from client-$id"
     val h = _heartBeatInfo
     val d = _printerMaybeDead
@@ -144,8 +145,7 @@ class PrintcatServer(conf: PrintcatConfig) extends Actor with ActorLogging {
       sender ! OutOfDateBeat
     }
   }
-
-  private def format(time: Long): Unit = {
+  private def format(time: Long): Unit ={
     new SimpleDateFormat("HH:mm:ss").format(new Date(time))
   }
 

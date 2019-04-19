@@ -28,8 +28,8 @@ class PrintcatServer(conf: PrintcatConfig) extends Actor with ActorLogging {
 
   override def receive = {
     case Register(name) => processRegister(name)
-    case GetPrinterList => processListPrinters
-    case Print(printerId, relativePath) => processPrint(printerId, relativePath)
+    case GetPrinterList(reqId) => processListPrinters(reqId)
+    case Print(reqId, printerId, relativePath) => processPrint(reqId, printerId, relativePath)
     case PrintSuceess(jobId) => processPrintSuccess(jobId)
     case PrintError(jobId, err) => processPrintError(jobId, err)
     case HeartBeat(id) => processHeartBeat(id)
@@ -40,8 +40,8 @@ class PrintcatServer(conf: PrintcatConfig) extends Actor with ActorLogging {
 
   private val _nextJobId = new AtomicLong(0)
   private def nextJobId = _nextJobId.getAndIncrement
-  //jobId -> (printerId, filePath, userCaller)
-  private val _printJobList = new ConcurrentHashMap[Long, (Long, String, ActorRef)]()
+  //jobId -> (printerId, filePath, requestId, userCaller)
+  private val _printJobList = new ConcurrentHashMap[Long, (Long, String, Long, ActorRef)]()
 
   private val _printerEndpoint = new ConcurrentHashMap[Long, (String, ActorRef)]()
   private val _printerDeadList = new ConcurrentHashMap[Long, (String, ActorRef)]()
@@ -100,34 +100,39 @@ class PrintcatServer(conf: PrintcatConfig) extends Actor with ActorLogging {
     _heartBeatInfo.put(cid, curTime)
     sender ! RegisterResp(cid)
   }
-  private def processListPrinters={
-    log info "GetPrinterList"
-    sender ! PrinterListResult(_printerEndpoint.mapValues(_._1).toList)
+  private def processListPrinters(reqId: Long)={
+    val printersJson = "{" + _printerEndpoint.mapValues(_._1)
+      .map{ case (id, name) =>
+        s"'$id':'$name'"
+      }.mkString(",") + "}"
+
+    log info s"GetPrinterList $printersJson"
+
+    val msg = PrinterListResult(reqId, printersJson)
+    sender ! msg
   }
-  private def processPrint(id: Long, path: String) ={
-    log info s"print $id $path"
-    if (_printerEndpoint containsKey id) {
+  private def processPrint(reqId: Long, printerId: Long, path: String) ={
+    log info s"print $printerId $path"
+    if (_printerEndpoint containsKey printerId) {
       val jobId = nextJobId
-      _printJobList.put(jobId, (id, path, sender))
-      val printer = _printerEndpoint.get(id)._2
+      _printJobList.put(jobId, (printerId, path, reqId, sender))
+      val printer = _printerEndpoint.get(printerId)._2
       printer ! DoPrint(jobId, path)
-    }
+    } else sender ! PrintErrorResp(reqId, "", path, "打印节点网络异常")
   }
-  private def getJobCaller(id: Long) = {
-    val res = _printJobList remove id
-    println(res)
-    res
-  }
+  private def getJobCaller(id: Long) =
+    _printJobList remove id
+
   private def processPrintSuccess(jobId: Long) =
     getJobCaller(jobId) match {
-      case (id, path, caller) =>
-        caller ! PrintSuceessResp(_printerEndpoint get id _1, path)
+      case (id, path, reqId, caller) =>
+        caller ! PrintSuceessResp(reqId, _printerEndpoint get id _1, path)
     }
 
   private def processPrintError(jobId: Long, err: String) =
     getJobCaller(jobId) match {
-      case (id, path, caller) =>
-        caller ! PrintErrorResp(_printerEndpoint get id _1, path, err)
+      case (id, path, reqId, caller) =>
+        caller ! PrintErrorResp(reqId, _printerEndpoint get id _1, path, err)
     }
 
   private def processHeartBeat(id: Long)={

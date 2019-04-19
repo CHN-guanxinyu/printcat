@@ -1,15 +1,21 @@
 package com.cartury.printcat
 
+import java.io.InputStream
+
 import org.apache.commons.configuration.PropertiesConfiguration
 
 import scala.collection.JavaConversions._
 import scala.util.Random
 
 object ConfigurationHelper {
+  def load(stream: InputStream) = {
+    val config = new PropertiesConfiguration
+    config.load(stream)
+    new PrintcatConfig(config)
+  }
   def load(path: String) = {
     val config = new PropertiesConfiguration(path)
     config setEncoding "UTF-8"
-    config load path
     new PrintcatConfig(config)
   }
 }

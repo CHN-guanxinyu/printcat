@@ -1,6 +1,6 @@
 #!/bin/bash
 cd `dirname $0`
 DIR=$('pwd')
-java -cp $DIR/../printcat.jar \
-com.cartury.printcat.PrintcatServer \
+java -classpath $DIR/../printcat.jar;$DIR/../printcat-dep.jar \
+com.cartury.printcat.akka.PrintcatServer \
 $*

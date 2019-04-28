@@ -16,13 +16,18 @@ case class AnyImplicitor[T](@transient t : T)
 
 case class StringImplicitor(@transient str : String) {
 
+
   /**
     * Usage: "package.to.classA".as[classA].foo.bar
     *
     * @tparam T
     * @return
     */
-  def as[T] = Class.forName(str).getConstructor().newInstance().asInstanceOf[T]
+  def as[T]: T = as()
+  def as[T](args: Object*): T =
+    Class.forName(str).getDeclaredConstructor(args.map(_.getClass) : _*).newInstance(args: _*).asInstanceOf[T]
+
+  def headToUpper = str.head.toUpper + str.tail
 
   def removeBlanks = replaceBlanks("")
 

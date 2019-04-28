@@ -6,10 +6,10 @@ import com.keene.core.implicits._
 import com.keene.core.parsers.Arguments
 import com.typesafe.config.ConfigFactory
 
-abstract class ActorBase(_system: String) extends App {
+abstract class ActorProdBase(_system: String) extends App {
   val printcatConfig = ConfigurationHelper load args.as[Args].configFile
 
-  def sysConfigStr: String
+  def sysConfigStr: String = ""
 
   val config = ConfigFactory.parseString(sysConfigStr).withFallback(ConfigFactory.load)
 

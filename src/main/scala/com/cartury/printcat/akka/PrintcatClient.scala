@@ -1,60 +1,57 @@
 package com.cartury.printcat.akka
 
-import java.util.concurrent.Executors
-
-import akka.actor.{Actor, ActorLogging, Props}
+import akka.actor.{ActorRef, Props}
+import akka.pattern.ask
 import com.cartury.printcat.akka.file.FileClient
 import com.cartury.printcat.{FileUtil, PrintcatConfig}
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.Await
 import scala.concurrent.duration._
-object PrintcatClient extends ActorBase("Printcat") {
 
-  override def sysConfigStr = ""
-
-  Future { FileClient main args }
-  system.actorOf(Props(new PrintcatClient(printcatConfig)), "client")
-}
-
-class PrintcatClient(conf: PrintcatConfig) extends Actor with ActorLogging {
-  private val pool = Executors.newScheduledThreadPool(1)
-  private val server = context actorSelection
-    s"akka.tcp://Printcat@${conf.PRINTCAT_SERVER_HOST}:${conf.PRINTCAT_SERVER_PORT}/user/server"
-
-  private lazy val fileClient = context actorSelection
-    s"akka.tcp://FileClient@localhost:${conf.FILE_CLIENT_PORT}/user/client"
-
-  override def preStart() = register
-
-
+class PrintcatClient(localEnv: PrintcatConfig) extends PrintcatActor {
   override def receive: Receive = {
+    case env: PrintcatConfig =>
+      fileClient = context.system.actorOf(Props(new FileClient(env)), "fileClient")
+      register
+
     case RegisterResp(id) => processRegisterResp(id)
+
+    case DoPrint(path) => processPrint(path)
 
     case OutOfDateBeat => register
 
-    case DoPrint(jobId, path) => processPrint(jobId, path)
-
-    case PrintSuceess(jobId) => server ! PrintSuceess(jobId)
-
-    case PrintError(jobId, err) => server ! PrintError(jobId, err)
-
-    case Close => context.system.terminate
+    case Close =>
+      println("get a shutting down message.")
+      sender ! 0
+      system.terminate
   }
 
-  private def register = server ! Register(conf.PRINTCAT_CLIENT_NAME)
+  private val server = context actorSelection
+    s"akka.tcp://Printcat@${localEnv.PRINTCAT_SERVER_HOST}:${localEnv.PRINTCAT_SERVER_PORT}/user/server"
 
-  private def processRegisterResp(id: Long) = {
-    log info s"register success, myid = $id"
-    context.system.scheduler.schedule(0 seconds, 2 seconds, sender, HeartBeat(id))
+  private var fileClient: ActorRef = _
+
+  private var remoteEnv: PrintcatConfig = _
+
+  override def preStart() = server ! GetEnv
+
+  private def register = server ! Register(localEnv.PRINTCAT_CLIENT_NAME)
+
+  private def processRegisterResp(myid: Long) = {
+    log info s"register success, myid = $myid"
+    context.system.scheduler.schedule(0 seconds, 2 seconds)(server ! HeartBeat(myid))
   }
 
-  private def processPrint(jobId: Long, path: String) = {
+  private def processPrint(path: String) = {
     log info "do print"
-    fileClient ! DownloadFile(jobId, path, file => {
+    Await.result(fileClient ? DownloadFile(path, file => {
       FileUtil print file
       file.delete
-    })
+    }), 3 seconds) match {
+      case DownloadSuceess => sender ! PrintSuceess
+      case DownloadError(err) => sender ! PrintError(err)
+      case _ => sender ! PrintError("timeout")
+    }
   }
 
 }

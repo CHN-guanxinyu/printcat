@@ -14,8 +14,9 @@ object ConfigurationHelper {
     new PrintcatConfig(config)
   }
   def load(path: String) = {
-    val config = new PropertiesConfiguration(path)
+    val config = new PropertiesConfiguration
     config setEncoding "UTF-8"
+    config load path
     new PrintcatConfig(config)
   }
 }
@@ -30,6 +31,7 @@ class PrintcatConfig(config: PropertiesConfiguration) {
   val PRINTCAT_SERVER_HOST = ps ~ ("host", "localhsot")
   val PRINTCAT_SERVER_PORT = ps ~ "port"
 
+  println(ps,pc,fs)
   val PRINTCAT_CLIENT_NAME = pc ~ ("name", s"client-${Random nextString 6}")
 
   val FILE_SERVER_HOST = fs ~ ("host", "localhost")

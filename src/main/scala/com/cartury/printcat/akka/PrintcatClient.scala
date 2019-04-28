@@ -13,9 +13,7 @@ object PrintcatClient extends ActorBase("Printcat") {
 
   override def sysConfigStr = ""
 
-  Future {
-    FileClient main args
-  }
+  Future { FileClient main args }
   system.actorOf(Props(new PrintcatClient(printcatConfig)), "client")
 }
 
@@ -33,10 +31,16 @@ class PrintcatClient(conf: PrintcatConfig) extends Actor with ActorLogging {
 
   override def receive: Receive = {
     case RegisterResp(id) => processRegisterResp(id)
+
     case OutOfDateBeat => register
+
     case DoPrint(jobId, path) => processPrint(jobId, path)
+
     case PrintSuceess(jobId) => server ! PrintSuceess(jobId)
+
     case PrintError(jobId, err) => server ! PrintError(jobId, err)
+
+    case Close => context.system.terminate
   }
 
   private def register = server ! Register(conf.PRINTCAT_CLIENT_NAME)

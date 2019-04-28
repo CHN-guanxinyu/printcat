@@ -18,7 +18,7 @@ object PrintcatServer extends ActorBase("Printcat") {
   Future { FileServer main args }
   override def sysConfigStr: String =
     s"""
-       |akka.remote.netty.tcp.host=${printcatConfig.PRINTCAT_SERVER_HOST}
+       |akka.remote.netty.tcp.hostname=${printcatConfig.PRINTCAT_SERVER_HOST}
        |akka.remote.netty.tcp.port=${printcatConfig.PRINTCAT_SERVER_PORT}
      """.stripMargin
 }
@@ -28,11 +28,18 @@ class PrintcatServer(conf: PrintcatConfig) extends Actor with ActorLogging {
 
   override def receive = {
     case Register(name) => processRegister(name)
+
     case GetPrinterList(reqId) => processListPrinters(reqId)
+
     case Print(reqId, printerId, relativePath) => processPrint(reqId, printerId, relativePath)
+
     case PrintSuceess(jobId) => processPrintSuccess(jobId)
+
     case PrintError(jobId, err) => processPrintError(jobId, err)
+
     case HeartBeat(id) => processHeartBeat(id)
+
+    case Close => context.system.terminate
   }
 
   private val _nextClientId = new AtomicLong(0)

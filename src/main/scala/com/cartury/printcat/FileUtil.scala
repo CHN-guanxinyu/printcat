@@ -25,9 +25,4 @@ object FileUtil {
       }
     }
   }
-
-  def main(args : Array[String]) : Unit = {
-    val file = new File("D:\\tmp\\file\\admin\\file\\2019\\04\\f0c35f405a7511e909d2ef931dc538ba.pdf")
-    print(file)
-  }
 }

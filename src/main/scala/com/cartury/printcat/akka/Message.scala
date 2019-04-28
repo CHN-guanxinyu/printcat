@@ -17,3 +17,4 @@ case class CheckStatus(id: Long) extends Serializable
 case class CheckStatusResp(id: Long) extends Serializable
 case class HeartBeat(id: Long) extends Serializable
 case object OutOfDateBeat extends Serializable
+case object Close extends Serializable

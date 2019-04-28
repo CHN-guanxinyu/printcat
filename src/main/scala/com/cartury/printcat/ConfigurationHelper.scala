@@ -21,7 +21,7 @@ object ConfigurationHelper {
   }
 }
 
-class PrintcatConfig(config: PropertiesConfiguration) {
+class PrintcatConfig(@transient config: PropertiesConfiguration) extends Serializable {
 
   private val ps = "printcat.server" **
   private val pc = "printcat.client" **
@@ -38,16 +38,17 @@ class PrintcatConfig(config: PropertiesConfiguration) {
   val FILE_SERVER_PORT = fs ~ "port"
   val FILE_SERVER_ROOT = fs ~ "root"
 
+  @Deprecated
   val FILE_CLIENT_PORT = fc ~ "port"
   val FILE_CLIENT_LOCAL_DIR = fc ~ "local.dir"
 
-  implicit class Config(s: String) {
+  private implicit class Config(s: String) {
     def prop = config getString s
 
     def ** = config getKeys s map (e => e.substring(s.length + 1) -> e.prop) toMap
   }
 
-  implicit class Mapper(map: Map[String, String]) {
+  private implicit class Mapper(map: Map[String, String]) {
     def ~(k: String, d: String = "") = map.getOrElse(k, d)
   }
 

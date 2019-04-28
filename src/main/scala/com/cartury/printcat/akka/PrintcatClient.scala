@@ -1,6 +1,6 @@
 package com.cartury.printcat.akka
 
-import java.util.concurrent.{Executors, TimeUnit}
+import java.util.concurrent.Executors
 
 import akka.actor.{Actor, ActorLogging, Props}
 import com.cartury.printcat.akka.file.FileClient
@@ -8,7 +8,7 @@ import com.cartury.printcat.{FileUtil, PrintcatConfig}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-
+import scala.concurrent.duration._
 object PrintcatClient extends ActorBase("Printcat") {
 
   override def sysConfigStr = ""
@@ -18,7 +18,6 @@ object PrintcatClient extends ActorBase("Printcat") {
 }
 
 class PrintcatClient(conf: PrintcatConfig) extends Actor with ActorLogging {
-  private var _id = -1L
   private val pool = Executors.newScheduledThreadPool(1)
   private val server = context actorSelection
     s"akka.tcp://Printcat@${conf.PRINTCAT_SERVER_HOST}:${conf.PRINTCAT_SERVER_PORT}/user/server"
@@ -47,16 +46,7 @@ class PrintcatClient(conf: PrintcatConfig) extends Actor with ActorLogging {
 
   private def processRegisterResp(id: Long) = {
     log info s"register success, myid = $id"
-    _id = id
-    startHeartBeatScheduler()
-  }
-
-  private def startHeartBeatScheduler(): Unit = {
-    pool.scheduleWithFixedDelay(new Runnable {
-      override def run() = {
-        server ! HeartBeat(_id)
-      }
-    }, 0, 2, TimeUnit.SECONDS)
+    context.system.scheduler.schedule(0 seconds, 2 seconds, sender, HeartBeat(id))
   }
 
   private def processPrint(jobId: Long, path: String) = {
